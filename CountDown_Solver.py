@@ -70,6 +70,34 @@ def mem_efficent_recurse_generate(items):
     return final_candidates
 
 
+
+def parallel_mem_efficent_recurse_generate(items):
+    final_candidates = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a,b = items[i], items[j]
+            candidates = [ a+b, a*b, ]
+            ap = candidates.append
+
+            if a > b: #This streamlines the checks slightly since b%a > 0 in this case
+                ap(a - b)
+                if a%b ==0: #b can not be zero since I don't let a-b = 0 ever so no need to check
+                    ap(a // b)
+            elif b > a :
+                ap(b-a)
+                if b % a == 0:
+                    ap(b // a)
+            else:
+                ap(1) #a/b
+
+            remaining_nums = [items[k] for k in range(len(items)) if k not in (i, j)]
+            for val in candidates:
+                final_candidates.extend(mem_efficent_recurse_generate(remaining_nums+ [val]))
+            final_candidates.extend(candidates)
+    return items, final_candidates
+
+
+
 def only_valid_final_targets(nums):
     valid_targets = [num for num in nums if num>0 and num%1 ==0]
     return valid_targets
@@ -125,13 +153,32 @@ def parallel_solve(all_sets):
         results = pool.map(mem_efficent_recurse_generate, all_sets)
     return results
 
-def parallel_solve_with_progress(all_sets):
-    with Pool() as pool:
-        for _ in tqdm(
-            pool.imap_unordered(mem_efficent_recurse_generate, all_sets, chunksize=50),
-            total=len(all_sets)
-        ):
-            pass
+def parallel_solve_with_progress(all_sets,num_large):
+    results = dict.fromkeys(all_sets, 0)
+    buffer = []
+
+    total = len(all_sets)
+    running_total = 0
+    completed = 0 
+    CHUNK_SIZE = 100
+
+    with open("results_num_large_"+str(num_large)+".txt", "w", buffering=1024*1024) as f, Pool() as pool:
+        for key,value in pool.imap_unordered(parallel_mem_efficent_recurse_generate, all_sets, chunksize=50):
+            #results[key] = value
+            buffer.append(f"{key},{value}\n")
+
+            completed += 1
+            if completed >= total/100:
+                running_total += completed
+                completed = 0 
+                print(f"{running_total}/{total}")
+                if len(buffer) >= CHUNK_SIZE:
+                            f.writelines(buffer)
+                            buffer.clear()
+
+    f.writelines(buffer)
+    return results
+
 
 
 if __name__ == "__main__":
@@ -145,11 +192,11 @@ if __name__ == "__main__":
 
     #targets = in_sequence_me_efficent_CDS(unique_total_sets)
     #targets = parallel_solve(unique_total_sets)
-    targets = parallel_solve_with_progress(unique_total_sets)
+    results = parallel_solve_with_progress(unique_total_sets, num_large)
 
     end_time = time.time()
 
-    print("Total endpoints considered: " +str(len(targets)))
+    print("Total endpoints considered: " +str(len(results)))
     print("Execution time:", end_time - start_time, "seconds")
 
 
