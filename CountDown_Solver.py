@@ -5,7 +5,7 @@ import itertools
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
 
-
+folder_location = ""
 
 large_numbers = [25, 50, 75, 100, 25, 50, 75, 100]
 small_numbers = [1,2,3,4,5,6,7,8,9,10, 1,2,3,4,5,6,7,8,9,10]
@@ -72,7 +72,7 @@ def mem_efficent_recurse_generate(items):
 
 
 def parallel_mem_efficent_recurse_generate(items):
-    final_candidates = []
+    final_candidates = [0]*1001 #{key: 0 for key in range(1,1000)}
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
             a,b = items[i], items[j]
@@ -91,9 +91,14 @@ def parallel_mem_efficent_recurse_generate(items):
                 ap(1) #a/b
 
             remaining_nums = [items[k] for k in range(len(items)) if k not in (i, j)]
+            nums_to_count =[val for val in candidates if val < 1000] 
             for val in candidates:
-                final_candidates.extend(mem_efficent_recurse_generate(remaining_nums+ [val]))
-            final_candidates.extend(candidates)
+                nums_to_count.extend(mem_efficent_recurse_generate(remaining_nums+ [val])) #We call the version that does not make a new dict here for memory purposes
+            #Only store solutions that are within the target range of the game [saves memory]
+            for num in nums_to_count:
+                if num < 1000:
+                    final_candidates[num] += 1
+            
     return items, final_candidates
 
 
@@ -154,15 +159,15 @@ def parallel_solve(all_sets):
     return results
 
 def parallel_solve_with_progress(all_sets,num_large):
-    results = dict.fromkeys(all_sets, 0)
+    #results = dict.fromkeys(all_sets, 0)
     buffer = []
 
     total = len(all_sets)
     running_total = 0
     completed = 0 
-    CHUNK_SIZE = 100
+    CHUNK_SIZE = 300
 
-    with open("results_num_large_"+str(num_large)+".txt", "w", buffering=1024*1024) as f, Pool() as pool:
+    with open(folder_location + "results_num_large_"+str(num_large)+".txt", "w", buffering=1024*1024) as f, Pool() as pool:
         for key,value in pool.imap_unordered(parallel_mem_efficent_recurse_generate, all_sets, chunksize=50):
             #results[key] = value
             buffer.append(f"{key},{value}\n")
@@ -173,11 +178,11 @@ def parallel_solve_with_progress(all_sets,num_large):
                 completed = 0 
                 print(f"{running_total}/{total}")
                 if len(buffer) >= CHUNK_SIZE:
-                            f.writelines(buffer)
-                            buffer.clear()
+                    f.writelines(buffer)
+                    buffer.clear()
 
-    f.writelines(buffer)
-    return results
+        f.writelines(buffer)
+    #return results
 
 
 
@@ -188,7 +193,8 @@ if __name__ == "__main__":
     start_time = time.time()
 
     unique_total_sets = generate_unique_countdown_sets(num_large)
-    print(len(unique_total_sets))
+    num_endpoints = len(unique_total_sets)
+    print(num_endpoints)
 
     #targets = in_sequence_me_efficent_CDS(unique_total_sets)
     #targets = parallel_solve(unique_total_sets)
@@ -196,8 +202,9 @@ if __name__ == "__main__":
 
     end_time = time.time()
 
-    print("Total endpoints considered: " +str(len(results)))
+    print("Total endpoints considered: " +str(num_endpoints))
     print("Execution time:", end_time - start_time, "seconds")
+    print("Average endpoint time:", num_endpoints/ (end_time - start_time), "seconds")
 
 
 
