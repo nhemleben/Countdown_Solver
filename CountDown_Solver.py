@@ -4,11 +4,33 @@ import time
 import itertools
 from multiprocessing import Pool, cpu_count
 from tqdm import tqdm
+from array import array
 
 folder_location = ""
 
 large_numbers = [25, 50, 75, 100, 25, 50, 75, 100]
 small_numbers = [1,2,3,4,5,6,7,8,9,10, 1,2,3,4,5,6,7,8,9,10]
+
+n = 3
+num_reasonable_limit = 10**n +1
+all_reasonable_2_pair_combos = [[array('H') for _ in range(num_reasonable_limit)] for _ in range(num_reasonable_limit)]
+for a in range(1, num_reasonable_limit):
+    for b in range(a, num_reasonable_limit): #only need to go from a
+        candidates = [ a+b, a*b, ]
+        ap = candidates.append
+        if a > b: #This streamlines the checks slightly since b%a > 0 in this case
+            ap(a - b)
+            if a%b ==0: #b can not be zero since I don't let a-b = 0 ever so no need to check
+                ap(a // b)
+        elif b > a :
+            ap(b-a)
+            if b % a == 0:
+                ap(b // a)
+        else:
+            ap(1) #a/b
+        all_reasonable_2_pair_combos[a][b] = candidates
+
+big_array = all_reasonable_2_pair_combos
 
 
 def fix_input(nums):
@@ -102,6 +124,76 @@ def parallel_mem_efficent_recurse_generate(items):
     return items, final_candidates
 
 
+def dyn_mem_efficent_recurse_generate(items):
+    final_candidates = []
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a,b = items[i], items[j]
+            #First try my pre made table, then do the actual math if you have to
+            if a <= 1000 and b <= 1000: 
+                if a < b:
+                    candidates = big_array[a][b]
+                else:
+                    candidates = big_array[b][a]
+            else:
+                candidates = [ a+b, a*b, ]
+                ap = candidates.append
+
+                if a > b: #This streamlines the checks slightly since b%a > 0 in this case
+                    ap(a - b)
+                    if a%b ==0: #b can not be zero since I don't let a-b = 0 ever so no need to check
+                        ap(a // b)
+                elif b > a :
+                    ap(b-a)
+                    if b % a == 0:
+                        ap(b // a)
+                else:
+                    ap(1) #a/b
+
+            remaining_nums = [items[k] for k in range(len(items)) if k not in (i, j)]
+            for val in candidates:
+                final_candidates.extend(dyn_mem_efficent_recurse_generate(remaining_nums+ [val]))
+            final_candidates.extend(candidates)
+    return final_candidates
+
+def dynamic_generate(items):
+    final_candidates = [0]*1001 #{key: 0 for key in range(1,1000)}
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a,b = items[i], items[j]
+            #First try my pre made table, then do the actual math if you have to
+            if a <= 1000 and b <= 1000: 
+                if a < b:
+                    candidates = big_array[a][b]
+                else:
+                    candidates = big_array[b][a]
+            else:
+                candidates = [ a+b, a*b, ]
+                ap = candidates.append
+
+                if a > b: #This streamlines the checks slightly since b%a > 0 in this case
+                    ap(a - b)
+                    if a%b ==0: #b can not be zero since I don't let a-b = 0 ever so no need to check
+                        ap(a // b)
+                elif b > a :
+                    ap(b-a)
+                    if b % a == 0:
+                        ap(b // a)
+                else:
+                    ap(1) #a/b
+
+            remaining_nums = [items[k] for k in range(len(items)) if k not in (i, j)]
+            nums_to_count =[val for val in candidates if val < 1000] 
+            for val in candidates:
+                nums_to_count.extend(dyn_mem_efficent_recurse_generate(remaining_nums+ [val])) #We call the version that does not make a new dict here for memory purposes
+            #Only store solutions that are within the target range of the game [saves memory]
+            for num in nums_to_count:
+                if num < 1000:
+                    final_candidates[num] += 1
+            
+    return items, final_candidates
+
+
 
 def only_valid_final_targets(nums):
     valid_targets = [num for num in nums if num>0 and num%1 ==0]
@@ -185,26 +277,53 @@ def parallel_solve_with_progress(all_sets,num_large):
     #return results
 
 
+def dynamic_solve_with_progress(all_sets,num_large):
+    #results = dict.fromkeys(all_sets, 0)
+    buffer = []
+
+    total = len(all_sets)
+    running_total = 0
+    completed = 0 
+    CHUNK_SIZE = 300
+
+    with open(folder_location + "dynamic_results_num_large_"+str(num_large)+".txt", "w", buffering=1024*1024) as f, Pool() as pool:
+        for key,value in pool.imap_unordered(dynamic_generate, all_sets, chunksize=50):
+            #results[key] = value
+            buffer.append(f"{key},{value}\n")
+
+            completed += 1
+            if completed >= total/100:
+                running_total += completed
+                completed = 0 
+                print(f"{running_total}/{total}")
+                if len(buffer) >= CHUNK_SIZE:
+                    f.writelines(buffer)
+                    buffer.clear()
+
+        f.writelines(buffer)
+    #return results
 
 if __name__ == "__main__":
 
-    num_large = 0
+    for num_large in [1,2]:
+        #num_large = 0
 
-    start_time = time.time()
+        start_time = time.time()
 
-    unique_total_sets = generate_unique_countdown_sets(num_large)
-    num_endpoints = len(unique_total_sets)
-    print(num_endpoints)
+        unique_total_sets = generate_unique_countdown_sets(num_large)
+        num_endpoints = len(unique_total_sets)
+        print(num_endpoints)
 
-    #targets = in_sequence_me_efficent_CDS(unique_total_sets)
-    #targets = parallel_solve(unique_total_sets)
-    results = parallel_solve_with_progress(unique_total_sets, num_large)
+        #targets = in_sequence_me_efficent_CDS(unique_total_sets)
+        #targets = parallel_solve(unique_total_sets)
+        #results = parallel_solve_with_progress(unique_total_sets, num_large)
+        results = dynamic_solve_with_progress(unique_total_sets, num_large)
 
-    end_time = time.time()
+        end_time = time.time()
 
-    print("Total endpoints considered: " +str(num_endpoints))
-    print("Execution time:", end_time - start_time, "seconds")
-    print("Average endpoint time:", num_endpoints/ (end_time - start_time), "seconds")
+        print("Total endpoints considered: " +str(num_endpoints))
+        print("Execution time:", end_time - start_time, "seconds")
+        print("Average endpoints per second :", num_endpoints/ (end_time - start_time))
 
 
 

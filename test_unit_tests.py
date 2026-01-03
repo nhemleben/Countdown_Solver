@@ -12,6 +12,20 @@ def test_two_numbers():
     assert max(targets)  ==3
     assert min(targets)  ==1
 
+def test_two_numbers_mem_efficent():
+    numbers = [1,2]
+    input_items = [(n, str(n)) for n in numbers]
+    targets = CDS.get_targets(CDS.mem_efficent_recurse_generate(input_items)) 
+    assert len(targets)  ==3
+    assert max(targets)  ==3
+    assert min(targets)  ==1
+
+def test_two_numbers_mem_efficent():
+    numbers = [1,2]
+    numbs, targets = CDS.parallel_mem_efficent_recurse_generate(numbers)
+    assert targets[3]  ==1
+    assert targets[2]  ==2
+    assert targets[1]  ==1
 
 def test_num_countdown_sets():
     no_large = CDS.generate_countdown_sets(0)
