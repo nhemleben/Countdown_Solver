@@ -305,9 +305,7 @@ def dynamic_solve_with_progress(all_sets,num_large):
 
 if __name__ == "__main__":
 
-    for num_large in [1,2]:
-        #num_large = 0
-
+    for num_large in [0]:
         start_time = time.time()
 
         unique_total_sets = generate_unique_countdown_sets(num_large)
